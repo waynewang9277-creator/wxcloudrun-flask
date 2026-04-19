@@ -15,12 +15,3 @@ def get_count():
 @count_bp.route('/api/count', methods=['POST'])
 def update_count():
     return make_json_response({'count': 0})
-
-
-@count_bp.route('/api/reportlab-test', methods=['GET'])
-def test_reportlab():
-    try:
-        from reportlab.lib.pagesizes import A4
-        return make_json_response({'reportlab': 'OK', 'version': A4})
-    except Exception as e:
-        return make_json_response({'reportlab': 'FAIL', 'error': str(e)}), 500
