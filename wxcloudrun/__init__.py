@@ -10,6 +10,3 @@ db = SQLAlchemy(app)
 
 from wxcloudrun import views
 app.register_blueprint(views.count_bp)
-
-from wxcloudrun.routes.battery_test import battery_test_bp
-app.register_blueprint(battery_test_bp, url_prefix='/api/battery-test')
