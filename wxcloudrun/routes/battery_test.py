@@ -1,18 +1,15 @@
 from flask import Blueprint, jsonify
 
-# 娴嬭瘯 reportlab 鍜?pdf_generator import
+# 鍗曠嫭娴嬭瘯 wxcloudrun.services.pdf_generator 鐨勫鍏?IMPORT_RESULT = 'not_tried'
 try:
-    from reportlab.lib.pagesizes import A4
-    from wxcloudrun.services.pdf_generator import PDFGenerator
-    IMPORT_OK = True
-    IMPORT_ERROR = None
+    from wxcloudrun.services import pdf_generator
+    IMPORT_RESULT = 'success'
 except Exception as e:
-    IMPORT_OK = False
-    IMPORT_ERROR = str(e)
+    IMPORT_RESULT = f'fail: {str(e)[:50]}'
 
 battery_test_bp = Blueprint('battery_test', __name__)
 
 
 @battery_test_bp.route('/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'ok', 'reportlab': IMPORT_OK, 'error': IMPORT_ERROR})
+    return jsonify({'status': 'ok', 'pdf_import': IMPORT_RESULT})
