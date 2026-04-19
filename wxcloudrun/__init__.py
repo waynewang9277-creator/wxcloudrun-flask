@@ -21,7 +21,6 @@ db = SQLAlchemy(app)
 from wxcloudrun import views
 
 # 注册电池测试蓝图
-from wxcloudrun.routes.battery_test import battery_test_bp
 app.register_blueprint(battery_test_bp, url_prefix='/api/battery-test')
 
 # 加载配置
