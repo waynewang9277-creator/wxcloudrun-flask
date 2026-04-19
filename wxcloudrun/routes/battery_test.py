@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, send_file
 import os
 import base64
 import uuid
-from .services.pdf_generator import PDFGenerator
+from wxcloudrun.services.pdf_generator import PDFGenerator
 
 battery_test_bp = Blueprint('battery_test', __name__)
 
