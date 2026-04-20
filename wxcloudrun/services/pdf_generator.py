@@ -272,6 +272,9 @@ class PDFGenerator:
             for idx, photo_data in enumerate(photos):
                 row = idx // photos_per_row
                 col = idx % photos_per_row
+                # Move y down when starting a new row (but not for first photo)
+                if col == 0 and idx > 0:
+                    y -= photo_h + gap
                 if y - photo_h < MARGIN + 5*mm:
                     c.showPage()
                     y = PAGE_H - MARGIN
