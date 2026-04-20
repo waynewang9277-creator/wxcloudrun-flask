@@ -11,14 +11,15 @@ RUN apk add --update --no-cache \
     && echo Asia/Shanghai > /etc/timezone \
     && rm -rf /var/cache/apk/*
 
-# Use Tencent mirror for pip
+# Copy code first
+WORKDIR /app
+COPY . /app
+
+# Use Tencent mirror for pip and install dependencies
 RUN pip config set global.index-url http://mirrors.cloud.tencent.com/pypi/simple \
 && pip config set global.trusted-host mirrors.cloud.tencent.com \
 && pip install --upgrade pip \
 && pip install --user -r requirements.txt
-
-WORKDIR /app
-COPY . /app
 
 EXPOSE 80
 
