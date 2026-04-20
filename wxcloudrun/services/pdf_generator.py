@@ -18,22 +18,55 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
 
+# Debug: list all fonts in Alpine Linux
+def _debug_fonts():
+    font_dirs = ['/usr/share/fonts', '/usr/local/share/fonts', '/share/fonts']
+    found = []
+    for d in font_dirs:
+        if os.path.exists(d):
+            for root, dirs, files in os.walk(d):
+                for f in files:
+                    if any(ext in f.lower() for ext in ['.ttf', '.ttc', '.otf']):
+                        found.append(os.path.join(root, f))
+    return found
+
 FONT_FILE = 'C:/Windows/Fonts/simsun.ttc'
-FONT_ALT = '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc'
 FONT_NAME = 'Helvetica'
 
+# Try Windows font first
 try:
     pdfmetrics.registerFont(TTFont('SimSun', FONT_FILE))
     FONT_NAME = 'SimSun'
 except:
-    # Try Alpine Linux CJK font path
-    try:
-        import os
-        if os.path.exists(FONT_ALT):
-            pdfmetrics.registerFont(TTFont('NotoSans', FONT_ALT))
+    pass
+
+# Try Alpine Linux font paths
+_alpine_font_paths = [
+    '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/noto-cjk/NotoSansCJKjp-Regular.ttc',
+    '/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.ttc',
+    '/usr/share/fonts/noto-cjk/NotoSansCJKtc-Regular.ttc',
+    '/usr/share/fonts/noto-cjk/NotoSans-Regular.ttc',
+    '/usr/share/fonts/noto-cjk/NotoSans-Bold.ttc',
+    '/usr/share/fonts/truetype/noto-cjk/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/TTF/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+]
+# Try glob patterns too
+for pattern in ['/usr/share/fonts/**/NotoSans*.ttc', '/usr/share/fonts/**/NotoSans*.ttf']:
+    import glob
+    for fp in glob.glob(pattern, recursive=True):
+        _alpine_font_paths.append(fp)
+
+for fp in _alpine_font_paths:
+    if os.path.exists(fp):
+        try:
+            pdfmetrics.registerFont(TTFont('NotoSans', fp))
             FONT_NAME = 'NotoSans'
-    except:
-        pass
+            print(f"DEBUG: Loaded font from {fp}")
+            break
+        except Exception as e:
+            print(f"DEBUG: Failed to load font from {fp}: {e}")
 
 PAGE_W, PAGE_H = A4
 MARGIN = 25 * mm
