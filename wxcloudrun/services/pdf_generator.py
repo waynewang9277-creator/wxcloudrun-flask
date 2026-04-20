@@ -118,7 +118,12 @@ def draw_chinese(c, text, x, y, font_size=12, color=(0, 0, 0)):
         if img_buf:
             try:
                 img_reader = ImageReader(img_buf)
-                c.drawImage(img_reader, x, y, preserveAspectRatio=True, mask='auto')
+                natural_w = img_reader.getSize()[0]
+                natural_h = img_reader.getSize()[1]
+                # Scale down by _SCALE to get actual display size
+                disp_w = natural_w / _SCALE
+                disp_h = natural_h / _SCALE
+                c.drawImage(img_reader, x, y, width=disp_w, height=disp_h, preserveAspectRatio=True, mask='auto')
                 return
             except Exception as e:
                 print(f"DEBUG: drawImage failed: {e}", flush=True)
@@ -134,10 +139,14 @@ def draw_chinese_centered(c, text, x, y, width, font_size=12, color=(0, 0, 0)):
         if img_buf:
             try:
                 img_reader = ImageReader(img_buf)
-                img_w = img_reader.getSize()[0]
-                # Center the image
-                img_x = x + (width - img_w) / 2
-                c.drawImage(img_reader, img_x, y, preserveAspectRatio=True, mask='auto')
+                natural_w = img_reader.getSize()[0]
+                natural_h = img_reader.getSize()[1]
+                # Scale down by _SCALE to get actual display size
+                disp_w = natural_w / _SCALE
+                disp_h = natural_h / _SCALE
+                # Center the image within the column width
+                img_x = x + (width - disp_w) / 2
+                c.drawImage(img_reader, img_x, y, width=disp_w, height=disp_h, preserveAspectRatio=True, mask='auto')
                 return
             except Exception as e:
                 print(f"DEBUG: drawImage centered failed: {e}", flush=True)
