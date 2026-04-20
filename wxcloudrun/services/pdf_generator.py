@@ -84,21 +84,21 @@ def render_chinese_text(text, font_size=12, color=(0, 0, 0)):
         font = _get_pil_font(font_size)
         if font is None:
             return None
-        # Create image with white background
-        draw = ImageDraw.Draw(None)
-        # Get text size using the font
-        bbox = (0, 0, 1, 1)  # fallback
+        # Get text size using textbbox
         try:
-            # Use ImageFont getbbox method
+            # Use a temporary 1x1 image to get text bbox
             img_temp = Image.new('RGB', (1, 1), (255, 255, 255))
             draw_temp = ImageDraw.Draw(img_temp)
             bbox = draw_temp.textbbox((0, 0), text, font=font)
-        except:
-            pass
-        text_w = bbox[2] - bbox[0] if bbox else len(text) * font_size * 0.6
-        text_h = bbox[3] - bbox[1] if bbox else font_size
-        # Create image with correct size
-        img = Image.new('RGBA', (int(text_w) + 10, int(text_h) + 4), (255, 255, 255, 255))
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+        except Exception as e:
+            # Fallback: estimate based on character count
+            print(f"DEBUG: textbbox failed: {e}", flush=True)
+            text_w = int(len(text) * font_size * 0.6)
+            text_h = font_size
+        # Create image with correct size (white background)
+        img = Image.new('RGBA', (text_w + 10, text_h + 4), (255, 255, 255, 255))
         draw_img = ImageDraw.Draw(img)
         draw_img.text((5, 2), text, font=font, fill=color + (255,))
         buf = BytesIO()
