@@ -1,73 +1,56 @@
+"""
+PDF Generator for Battery Test Reports
+Uses Pillow to render Chinese text as images, bypassing reportlab TTFont issues
+"""
 import os
-from datetime import datetime
-from io import BytesIO
-import base64
-import hashlib
+import sys
 
-# Alpine Linux 兼容：移除 usedforsecurity 参数
+# Alpine Linux md5 patch
+import hashlib
 _original_md5 = hashlib.md5
 def _patched_md5(data=b'', *, usedforsecurity=True, **kwargs):
     kwargs.pop('usedforsecurity', None)
     return _original_md5(data, **kwargs)
 hashlib.md5 = _patched_md5
 
+from io import BytesIO
+from datetime import datetime
+import base64
+
+# Check PIL availability
+_pillow_available = False
+_image_font = None
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    _pillow_available = True
+    # Try to load Chinese font
+    _font_paths = [
+        '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/noto/NotoSansCJK-Bold.ttc',
+        '/usr/share/fonts/noto/NotoSansCJKsc-Regular.ttc',
+        '/usr/share/fonts/noto/NotoSansCJKtc-Regular.ttc',
+        '/usr/share/fonts/noto/NotoSans-Regular.ttc',
+        '/usr/share/fonts/noto/NotoSerifCJK-Regular.ttc',
+        '/usr/share/fonts/noto/NotoSerifCJK-Bold.ttc',
+    ]
+    for fp in _font_paths:
+        if os.path.exists(fp):
+            try:
+                # PIL can load TTC files
+                _image_font = ImageFont.truetype(fp, 20)
+                print(f"DEBUG: PIL loaded font from {fp}", flush=True)
+                break
+            except Exception as e:
+                print(f"DEBUG: PIL failed font {fp}: {e}", flush=True)
+    if _image_font is None:
+        print("DEBUG: PIL could not load any Chinese font", flush=True)
+except ImportError as e:
+    print(f"DEBUG: PIL not available: {e}", flush=True)
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
-
-# Debug: list all fonts in Alpine Linux
-def _debug_fonts():
-    font_dirs = ['/usr/share/fonts', '/usr/local/share/fonts', '/share/fonts']
-    found = []
-    for d in font_dirs:
-        if os.path.exists(d):
-            for root, dirs, files in os.walk(d):
-                for f in files:
-                    if any(ext in f.lower() for ext in ['.ttf', '.ttc', '.otf']):
-                        found.append(os.path.join(root, f))
-    return found
-
-FONT_FILE = 'C:/Windows/Fonts/simsun.ttc'
-FONT_NAME = 'Helvetica'  # Default fallback - does NOT support Chinese
-
-# Try Windows font first
-try:
-    pdfmetrics.registerFont(TTFont('SimSun', FONT_FILE))
-    FONT_NAME = 'SimSun'
-    print(f"DEBUG: Windows font loaded, FONT_NAME={FONT_NAME}", flush=True)
-except Exception as e:
-    print(f"DEBUG: Windows font FAILED: {e}", flush=True)
-
-# Try Alpine Linux font paths
-_alpine_font_candidates = [
-    '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
-    '/usr/share/fonts/noto/NotoSansCJK-Bold.ttc',
-    '/usr/share/fonts/noto/NotoSansCJKsc-Regular.ttc',
-    '/usr/share/fonts/noto/NotoSansCJKtc-Regular.ttc',
-    '/usr/share/fonts/noto/NotoSans-Regular.ttc',
-    '/usr/share/fonts/noto/NotoSans-Bold.ttc',
-    '/usr/share/fonts/noto/NotoSerifCJK-Regular.ttc',
-    '/usr/share/fonts/noto/NotoSerifCJK-Bold.ttc',
-]
-_print = print  # capture print function
-for fp in _alpine_font_candidates:
-    if os.path.exists(fp):
-        try:
-            font_test = TTFont('NotoSans', fp)
-            pdfmetrics.registerFont(font_test)
-            FONT_NAME = 'NotoSans'
-            FONT_FILE = fp
-            _print(f"DEBUG: Alpine font loaded from {fp}, FONT_NAME={FONT_NAME}", flush=True)
-            break
-        except Exception as e:
-            _print(f"DEBUG: TTFont FAILED for {fp}: {e}", flush=True)
-    else:
-        _print(f"DEBUG: Font file not found: {fp}", flush=True)
-
-print(f"DEBUG: FINAL FONT_NAME={FONT_NAME}, FONT_FILE={FONT_FILE}", flush=True)
 
 PAGE_W, PAGE_H = A4
 MARGIN = 25 * mm
@@ -76,17 +59,45 @@ HEADERS = ['序号', '应急装置安装地点', '放电时间', '剩余电量%'
 TIME_POINTS = ['0分钟', '20分钟', '40分钟', '80分钟', '100分钟', '120分钟']
 
 
-def decode_base64_image(data: str):
-    if not data:
+def render_chinese_text(text, font_size=12, color=(0, 0, 0)):
+    """Render Chinese text to a PIL image and return as bytes"""
+    if not _pillow_available or _image_font is None:
         return None
     try:
-        if ',' in data:
-            data = data.split(',', 1)[1]
-        img_bytes = base64.b64decode(data)
-        buf = BytesIO(img_bytes)
-        return ImageReader(buf)
-    except Exception:
+        # Create image with transparent background
+        img = Image.new('RGBA', (500, 50), (255, 255, 255, 0))
+        draw = ImageDraw.Draw(img)
+        # Get text size
+        bbox = draw.textbbox((0, 0), text, font=_image_font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        # Recreate with correct size
+        img = Image.new('RGBA', (text_w + 10, text_h + 5), (255, 255, 255, 0))
+        draw = ImageDraw.Draw(img)
+        draw.text((5, 2), text, font=_image_font, fill=color + (255,))
+        buf = BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        return buf
+    except Exception as e:
+        print(f"DEBUG: render_chinese_text failed: {e}", flush=True)
         return None
+
+
+def draw_chinese(c, text, x, y, font_size=12, color=(0, 0, 0)):
+    """Draw Chinese text either via PIL image or fallback"""
+    if _pillow_available and _image_font is not None:
+        img_buf = render_chinese_text(text, font_size, color)
+        if img_buf:
+            try:
+                img_reader = ImageReader(img_buf)
+                c.drawImage(img_reader, x, y, preserveAspectRatio=True, mask='auto')
+                return
+            except Exception as e:
+                print(f"DEBUG: drawImage failed: {e}", flush=True)
+    # Fallback: just draw text (will show squares for Chinese)
+    c.setFont('Helvetica', font_size)
+    c.drawString(x, y, text)
 
 
 class PDFGenerator:
@@ -94,7 +105,6 @@ class PDFGenerator:
         tests = data.get('tests', [])
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         loc = (tests[0].get('location', 'unknown') if tests else 'unknown')
-        # 只移除非法文件名字符，保留中文和空格
         import re
         safe_chars = re.sub(r'[/\\:*?"<>|]', '_', loc)
         loc_clean = safe_chars.strip().replace(' ', '_')
@@ -120,35 +130,31 @@ class PDFGenerator:
         row_h = 8 * mm
         y = PAGE_H - MARGIN
 
-        # 每页标题（含测试组编号）
-        c.setFont(FONT_NAME, 14)
+        # Title
+        c.setFont('Helvetica', 14)
         title = f'应急装置电池放电时间记录表  ({test_num}/{total_tests})'
-        title_w = c.stringWidth(title, FONT_NAME, 14)
+        title_w = c.stringWidth(title, 'Helvetica', 14)
         c.drawString((PAGE_W - title_w) / 2, y, title)
         y -= 10 * mm
 
-        # 地点信息行
+        # Location info
         loc_val = test.get('location', '')
         start_time = test.get('startTime', '')
-        c.setFont(FONT_NAME, 9)
-        info_line = f'安装地点：{loc_val}　　　开始时间：{start_time}'
-        c.drawString(MARGIN, y, info_line)
+        draw_chinese(c, f'安装地点：{loc_val}　　　开始时间：{start_time}', MARGIN, y, font_size=9)
         y -= 8 * mm
 
-        # 表头
+        # Table headers
         x = MARGIN
         for w, h_text in zip(COL_WIDTHS, HEADERS):
             c.setFillColorRGB(0.85, 0.85, 0.85)
             c.setStrokeColorRGB(0.3, 0.3, 0.3)
             c.rect(x, y - 8*mm, w, 8*mm, fill=1, stroke=1)
             c.setFillColorRGB(0, 0, 0)
-            c.setFont(FONT_NAME, 9)
-            tw = c.stringWidth(h_text, FONT_NAME, 9)
-            c.drawString(x + (w - tw) / 2, y - 8*mm + 2, h_text)
+            draw_chinese(c, h_text, x + (w - c.stringWidth(h_text, 'Helvetica', 9)) / 2, y - 8*mm + 2, font_size=9)
             x += w
         y -= 8 * mm
 
-        # 6行数据
+        # 6 rows of data
         records = test.get('records', [])
         for i in range(6):
             voltage = ''
@@ -158,53 +164,48 @@ class PDFGenerator:
             row_y = y - row_h
             cx = MARGIN
 
-            # A 序号
+            # Column A: sequence number
             c.setStrokeColorRGB(0.3, 0.3, 0.3)
             c.rect(cx, row_y, COL_WIDTHS[0], row_h)
-            c.setFont(FONT_NAME, 8)
+            c.setFont('Helvetica', 8)
             s = str(i + 1)
-            tw = c.stringWidth(s, FONT_NAME, 8)
+            tw = c.stringWidth(s, 'Helvetica', 8)
             c.drawString(cx + (COL_WIDTHS[0] - tw) / 2, row_y + 2, s)
             cx += COL_WIDTHS[0]
 
-            # B 地点（只在首行显示）
+            # Column B: location (only first row)
             c.rect(cx, row_y, COL_WIDTHS[1], row_h)
             if i == 0:
-                c.setFont(FONT_NAME, 8)
                 max_ch = int(COL_WIDTHS[1] / (8 * 0.5))
                 disp = loc_val[:max_ch] + ('..' if len(loc_val) > max_ch else '')
-                c.drawString(cx + 2, row_y + 2, disp)
+                draw_chinese(c, disp, cx + 2, row_y + 2, font_size=8)
             cx += COL_WIDTHS[1]
 
-            # C 放电时间
+            # Column C: discharge time
             c.rect(cx, row_y, COL_WIDTHS[2], row_h)
-            c.setFont(FONT_NAME, 8)
             t = TIME_POINTS[i]
-            tw = c.stringWidth(t, FONT_NAME, 8)
-            c.drawString(cx + (COL_WIDTHS[2] - tw) / 2, row_y + 2, t)
+            draw_chinese(c, t, cx + (COL_WIDTHS[2] - c.stringWidth(t, 'Helvetica', 8)) / 2, row_y + 2, font_size=8)
             cx += COL_WIDTHS[2]
 
-            # D 剩余电量
+            # Column D: remaining battery
             c.rect(cx, row_y, COL_WIDTHS[3], row_h)
-            c.setFont(FONT_NAME, 8)
-            tw = c.stringWidth(voltage, FONT_NAME, 8)
+            c.setFont('Helvetica', 8)
+            tw = c.stringWidth(voltage, 'Helvetica', 8)
             c.drawString(cx + (COL_WIDTHS[3] - tw) / 2, row_y + 2, voltage)
             cx += COL_WIDTHS[3]
 
-            # E 备注（只在首行显示开始时间）
+            # Column E: remarks (only first row)
             c.rect(cx, row_y, COL_WIDTHS[4], row_h)
             if i == 0:
-                c.setFont(FONT_NAME, 7)
-                c.drawString(cx + 2, row_y + 2, start_time[:15])
+                draw_chinese(c, start_time[:15], cx + 2, row_y + 2, font_size=7)
 
             y = row_y
 
-        # ===== 照片区域（每个测试单独整理）=====
+        # Photo area
         photos = [rec.get('photoBase64', '') for rec in records if rec.get('photoBase64')]
         if photos:
             y -= 6 * mm
-            c.setFont(FONT_NAME, 10)
-            c.drawString(MARGIN, y, '放电测试照片记录')
+            draw_chinese(c, '放电测试照片记录', MARGIN, y, font_size=10)
             y -= 5 * mm
 
             photos_per_row = 3
@@ -219,40 +220,29 @@ class PDFGenerator:
                 if y - photo_h < MARGIN + 5*mm:
                     c.showPage()
                     y = PAGE_H - MARGIN
-                    c.setFont(FONT_NAME, 10)
-                    c.drawString(MARGIN, y, f'放电测试照片记录（{test_num}/{total_tests} 续）')
-                    y -= 5 * mm
-
-                img_reader = decode_base64_image(photo_data)
                 px = MARGIN + col * (photo_w + gap)
                 py = y - photo_h
-                if img_reader:
+                if photo_data and photo_data.startswith('data:image'):
                     try:
-                        c.drawImage(img_reader, px, py, width=photo_w, height=photo_h,
-                                    preserveAspectRatio=True, anchor='c')
-                    except Exception:
-                        c.setStrokeColorRGB(0.7, 0.7, 0.7)
-                        c.rect(px, py, photo_w, photo_h)
-                else:
-                    c.setStrokeColorRGB(0.7, 0.7, 0.7)
-                    c.rect(px, py, photo_w, photo_h)
+                        b64 = photo_data.split(',')[1]
+                        img_bytes = base64.b64decode(b64)
+                        img_buf = BytesIO(img_bytes)
+                        img_reader = ImageReader(img_buf)
+                        c.drawImage(img_reader, px, py, width=photo_w, height=photo_h, preserveAspectRatio=True)
+                    except Exception as e:
+                        print(f"DEBUG: photo error: {e}", flush=True)
+                c.setStrokeColorRGB(0.5, 0.5, 0.5)
+                c.rect(px, py, photo_w, photo_h)
 
-                c.setFont(FONT_NAME, 7)
-                c.setFillColorRGB(0.4, 0.4, 0.4)
-                label = f"照片 {idx + 1}"
-                c.drawString(px, py - 3*mm, label)
-                c.setFillColorRGB(0, 0, 0)
 
-                if col == photos_per_row - 1:
-                    y -= (photo_h + 4 * mm)
-            else:
-                if col < photos_per_row - 1:
-                    y -= (photo_h + 4 * mm)
-
-        # 页脚
-        c.setFont(FONT_NAME, 7)
-        c.setFillColorRGB(0.5, 0.5, 0.5)
-        footer = f'生成时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}　　第 {test_num} 页 / 共 {total_tests} 页'
-        fw = c.stringWidth(footer, FONT_NAME, 7)
-        c.drawString(PAGE_W - MARGIN - fw, MARGIN - 3*mm, footer)
-        c.setFillColorRGB(0, 0, 0)
+def decode_base64_image(data: str):
+    if not data:
+        return None
+    try:
+        if ',' in data:
+            data = data.split(',', 1)[1]
+        img_bytes = base64.b64decode(data)
+        buf = BytesIO(img_bytes)
+        return ImageReader(buf)
+    except Exception:
+        return None
