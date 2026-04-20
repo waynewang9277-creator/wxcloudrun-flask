@@ -19,6 +19,7 @@ import base64
 
 _pillow_font = None
 _font_cache = {}  # Cache font objects by size
+_SCALE = 2  # Render at 2x resolution for crisp text
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -66,12 +67,14 @@ def _get_pil_font(size):
     global _chinese_font_path
     if not _pillow_available or _chinese_font_path is None:
         return None
-    key = f"{_chinese_font_path}_{size}"
+    # Use 2x size for crisp rendering, cache by scaled size
+    scaled_size = size * _SCALE
+    key = f"{_chinese_font_path}_{scaled_size}"
     if key not in _font_cache:
         try:
-            _font_cache[key] = ImageFont.truetype(_chinese_font_path, size)
+            _font_cache[key] = ImageFont.truetype(_chinese_font_path, scaled_size)
         except Exception as e:
-            print(f"DEBUG: Failed to load PIL font size {size}: {e}", flush=True)
+            print(f"DEBUG: Failed to load PIL font size {scaled_size}: {e}", flush=True)
             return None
     return _font_cache[key]
 
@@ -84,20 +87,18 @@ def render_chinese_text(text, font_size=12, color=(0, 0, 0)):
         font = _get_pil_font(font_size)
         if font is None:
             return None
-        # Get text size using textbbox
+        # Get text size using textbbox at scaled resolution
         try:
-            # Use a temporary 1x1 image to get text bbox
             img_temp = Image.new('RGB', (1, 1), (255, 255, 255))
             draw_temp = ImageDraw.Draw(img_temp)
             bbox = draw_temp.textbbox((0, 0), text, font=font)
             text_w = bbox[2] - bbox[0]
             text_h = bbox[3] - bbox[1]
         except Exception as e:
-            # Fallback: estimate based on character count
             print(f"DEBUG: textbbox failed: {e}", flush=True)
-            text_w = int(len(text) * font_size * 0.6)
-            text_h = font_size
-        # Create image with correct size (white background)
+            text_w = int(len(text) * font_size * _SCALE * 0.6)
+            text_h = font_size * _SCALE
+        # Create image with correct size (white background) at 2x resolution
         img = Image.new('RGBA', (text_w + 10, text_h + 4), (255, 255, 255, 255))
         draw_img = ImageDraw.Draw(img)
         draw_img.text((5, 2), text, font=font, fill=color + (255,))
