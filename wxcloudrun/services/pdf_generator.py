@@ -302,30 +302,32 @@ class PDFGenerator:
                 c.rect(px, py, photo_w, photo_h)
 
         # Signature area at bottom - 3 columns for 操作者/领班/工程主任
-        sig_y = MARGIN + 15 * mm
+        # Layout: label+line on same row, date+line on same row below
+        sig_y = MARGIN + 18 * mm  # Start a bit higher
         sig_col_w = (PAGE_W - 2 * MARGIN) / 3
         sig_labels = ['操作者：', '领班：', '工程主任：']
 
         for i, label in enumerate(sig_labels):
             col_x = MARGIN + i * sig_col_w
-            # Draw label
+            # Draw label and signature line on SAME row
             draw_chinese(c, label, col_x, sig_y, font_size=9)
-            # Draw signature line
-            sig_line_y = sig_y - 8 * mm
+            # Draw signature line to the right of label, on same row
+            sig_line_y = sig_y - 2 * mm  # Just below text baseline
             c.setStrokeColorRGB(0, 0, 0)
             c.setLineWidth(0.5)
-            c.line(col_x, sig_line_y, col_x + sig_col_w - 10*mm, sig_line_y)
-            # Draw 日期 label and line below
-            date_y = sig_line_y - 6 * mm
-            draw_chinese(c, '日期：', col_x, date_y, font_size=9)
-            c.line(col_x + 15*mm, date_y - 2*mm, col_x + sig_col_w - 10*mm, date_y - 2*mm)
+            label_w = 25 * mm  # Width for label area
+            c.line(col_x + label_w, sig_line_y, col_x + sig_col_w - 5*mm, sig_line_y)
 
-        # Form number at bottom
+            # Draw 日期 label and line on NEXT row (same line style)
+            date_y = sig_y - 10 * mm  # One row below
+            draw_chinese(c, '日期：', col_x, date_y, font_size=9)
+            c.line(col_x + label_w, date_y - 2*mm, col_x + sig_col_w - 5*mm, date_y - 2*mm)
+
+        # Form number on separate row below, LEFT aligned
         form_no = 'SHKS/R0/2579/REV03/20240630'
-        form_y = MARGIN
+        form_y = MARGIN + 3 * mm  # Below signature area
         c.setFont('Helvetica', 7)
-        form_w = c.stringWidth(form_no, 'Helvetica', 7)
-        c.drawString((PAGE_W - form_w) / 2, form_y, form_no)
+        c.drawString(MARGIN, form_y, form_no)
 
         # Export globals for fonttest endpoint
         global FONT_NAME, FONT_FILE
