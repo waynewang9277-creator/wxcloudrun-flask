@@ -42,15 +42,13 @@ except:
 
 # Try Alpine Linux font paths
 _alpine_font_paths = [
-    '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
-    '/usr/share/fonts/noto-cjk/NotoSansCJKjp-Regular.ttc',
-    '/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.ttc',
-    '/usr/share/fonts/noto-cjk/NotoSansCJKtc-Regular.ttc',
-    '/usr/share/fonts/noto-cjk/NotoSans-Regular.ttc',
-    '/usr/share/fonts/noto-cjk/NotoSans-Bold.ttc',
-    '/usr/share/fonts/truetype/noto-cjk/NotoSansCJK-Regular.ttc',
-    '/usr/share/fonts/TTF/NotoSansCJK-Regular.ttc',
     '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/noto/NotoSansCJK-Bold.ttc',
+    '/usr/share/fonts/noto/NotoSansCJKsc-Regular.ttc',
+    '/usr/share/fonts/noto/NotoSansCJKtc-Regular.ttc',
+    '/usr/share/fonts/noto/NotoSans-Regular.ttc',
+    '/usr/share/fonts/noto/NotoSerifCJK-Regular.ttc',
+    '/usr/share/fonts/noto/NotoSerifCJK-Bold.ttc',
 ]
 # Try glob patterns too
 for pattern in ['/usr/share/fonts/**/NotoSans*.ttc', '/usr/share/fonts/**/NotoSans*.ttf']:
