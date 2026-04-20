@@ -17,13 +17,14 @@ from io import BytesIO
 from datetime import datetime
 import base64
 
-# Check PIL availability
-_pillow_available = False
-_image_font = None
+_pillow_font = None
+_font_cache = {}  # Cache font objects by size
+
 try:
     from PIL import Image, ImageDraw, ImageFont
     _pillow_available = True
-    # Try to load Chinese font
+    # Try to load Chinese font - store path for reuse
+    _chinese_font_path = None
     _font_paths = [
         '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
         '/usr/share/fonts/noto/NotoSansCJK-Bold.ttc',
@@ -36,16 +37,17 @@ try:
     for fp in _font_paths:
         if os.path.exists(fp):
             try:
-                # PIL can load TTC files
-                _image_font = ImageFont.truetype(fp, 20)
-                print(f"DEBUG: PIL loaded font from {fp}", flush=True)
+                # PIL can load TTC files - store path for later
+                _chinese_font_path = fp
+                print(f"DEBUG: PIL found Chinese font at {fp}", flush=True)
                 break
             except Exception as e:
                 print(f"DEBUG: PIL failed font {fp}: {e}", flush=True)
-    if _image_font is None:
-        print("DEBUG: PIL could not load any Chinese font", flush=True)
+    if _chinese_font_path is None:
+        print("DEBUG: PIL could not find any Chinese font", flush=True)
 except ImportError as e:
     print(f"DEBUG: PIL not available: {e}", flush=True)
+    _pillow_available = False
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -59,22 +61,46 @@ HEADERS = ['序号', '应急装置安装地点', '放电时间', '剩余电量%'
 TIME_POINTS = ['0分钟', '20分钟', '40分钟', '80分钟', '100分钟', '120分钟']
 
 
+def _get_pil_font(size):
+    """Get or create cached PIL font object for given size"""
+    global _chinese_font_path
+    if not _pillow_available or _chinese_font_path is None:
+        return None
+    key = f"{_chinese_font_path}_{size}"
+    if key not in _font_cache:
+        try:
+            _font_cache[key] = ImageFont.truetype(_chinese_font_path, size)
+        except Exception as e:
+            print(f"DEBUG: Failed to load PIL font size {size}: {e}", flush=True)
+            return None
+    return _font_cache[key]
+
+
 def render_chinese_text(text, font_size=12, color=(0, 0, 0)):
     """Render Chinese text to a PIL image and return as bytes"""
-    if not _pillow_available or _image_font is None:
+    if not _pillow_available or _chinese_font_path is None:
         return None
     try:
-        # Create image with transparent background
-        img = Image.new('RGBA', (500, 50), (255, 255, 255, 0))
-        draw = ImageDraw.Draw(img)
-        # Get text size
-        bbox = draw.textbbox((0, 0), text, font=_image_font)
-        text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
-        # Recreate with correct size
-        img = Image.new('RGBA', (text_w + 10, text_h + 5), (255, 255, 255, 0))
-        draw = ImageDraw.Draw(img)
-        draw.text((5, 2), text, font=_image_font, fill=color + (255,))
+        font = _get_pil_font(font_size)
+        if font is None:
+            return None
+        # Create image with white background
+        draw = ImageDraw.Draw(None)
+        # Get text size using the font
+        bbox = (0, 0, 1, 1)  # fallback
+        try:
+            # Use ImageFont getbbox method
+            img_temp = Image.new('RGB', (1, 1), (255, 255, 255))
+            draw_temp = ImageDraw.Draw(img_temp)
+            bbox = draw_temp.textbbox((0, 0), text, font=font)
+        except:
+            pass
+        text_w = bbox[2] - bbox[0] if bbox else len(text) * font_size * 0.6
+        text_h = bbox[3] - bbox[1] if bbox else font_size
+        # Create image with correct size
+        img = Image.new('RGBA', (int(text_w) + 10, int(text_h) + 4), (255, 255, 255, 255))
+        draw_img = ImageDraw.Draw(img)
+        draw_img.text((5, 2), text, font=font, fill=color + (255,))
         buf = BytesIO()
         img.save(buf, format='PNG')
         buf.seek(0)
@@ -86,7 +112,7 @@ def render_chinese_text(text, font_size=12, color=(0, 0, 0)):
 
 def draw_chinese(c, text, x, y, font_size=12, color=(0, 0, 0)):
     """Draw Chinese text either via PIL image or fallback"""
-    if _pillow_available and _image_font is not None:
+    if _pillow_available and _chinese_font_path is not None:
         img_buf = render_chinese_text(text, font_size, color)
         if img_buf:
             try:
@@ -98,6 +124,26 @@ def draw_chinese(c, text, x, y, font_size=12, color=(0, 0, 0)):
     # Fallback: just draw text (will show squares for Chinese)
     c.setFont('Helvetica', font_size)
     c.drawString(x, y, text)
+
+
+def draw_chinese_centered(c, text, x, y, width, font_size=12, color=(0, 0, 0)):
+    """Draw Chinese text centered within a width"""
+    if _pillow_available and _chinese_font_path is not None:
+        img_buf = render_chinese_text(text, font_size, color)
+        if img_buf:
+            try:
+                img_reader = ImageReader(img_buf)
+                img_w = img_reader.getSize()[0]
+                # Center the image
+                img_x = x + (width - img_w) / 2
+                c.drawImage(img_reader, img_x, y, preserveAspectRatio=True, mask='auto')
+                return
+            except Exception as e:
+                print(f"DEBUG: drawImage centered failed: {e}", flush=True)
+    # Fallback
+    c.setFont('Helvetica', font_size)
+    tw = c.stringWidth(text, 'Helvetica', font_size)
+    c.drawString(x + (width - tw) / 2, y, text)
 
 
 class PDFGenerator:
@@ -130,11 +176,9 @@ class PDFGenerator:
         row_h = 8 * mm
         y = PAGE_H - MARGIN
 
-        # Title
-        c.setFont('Helvetica', 14)
-        title = f'应急装置电池放电时间记录表  ({test_num}/{total_tests})'
-        title_w = c.stringWidth(title, 'Helvetica', 14)
-        c.drawString((PAGE_W - title_w) / 2, y, title)
+        # Title - use draw_chinese_centered for full title with Chinese
+        title_text = f'应急装置电池放电时间记录表  ({test_num}/{total_tests})'
+        draw_chinese(c, title_text, MARGIN, y, font_size=14)
         y -= 10 * mm
 
         # Location info
@@ -150,7 +194,7 @@ class PDFGenerator:
             c.setStrokeColorRGB(0.3, 0.3, 0.3)
             c.rect(x, y - 8*mm, w, 8*mm, fill=1, stroke=1)
             c.setFillColorRGB(0, 0, 0)
-            draw_chinese(c, h_text, x + (w - c.stringWidth(h_text, 'Helvetica', 9)) / 2, y - 8*mm + 2, font_size=9)
+            draw_chinese_centered(c, h_text, x, y - 8*mm + 2, w, font_size=9)
             x += w
         y -= 8 * mm
 
