@@ -303,7 +303,7 @@ class PDFGenerator:
 
         # Signature area at bottom - 3 columns for 操作者/领班/工程主任
         # Layout: label+line on same row, date+line on same row below
-        sig_y = MARGIN + 18 * mm  # Start a bit higher
+        sig_y = MARGIN + 34 * mm  # Start higher (moved up 2 rows from previous)
         sig_col_w = (PAGE_W - 2 * MARGIN) / 3
         sig_labels = ['操作者：', '领班：', '工程主任：']
 
@@ -323,9 +323,9 @@ class PDFGenerator:
             draw_chinese(c, '日期：', col_x, date_y, font_size=9)
             c.line(col_x + label_w, date_y - 2*mm, col_x + sig_col_w - 5*mm, date_y - 2*mm)
 
-        # Form number on separate row below, LEFT aligned
+        # Form number on separate row below, LEFT aligned, with big gap from signature
         form_no = 'SHKS/R0/2579/REV03/20240630'
-        form_y = MARGIN + 3 * mm  # Below signature area
+        form_y = MARGIN + 10 * mm  # Well below signature area (20mm gap)
         c.setFont('Helvetica', 7)
         c.drawString(MARGIN, form_y, form_no)
 
