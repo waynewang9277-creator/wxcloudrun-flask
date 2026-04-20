@@ -19,11 +19,21 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
 
 FONT_FILE = 'C:/Windows/Fonts/simsun.ttc'
+FONT_ALT = '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc'
+FONT_NAME = 'Helvetica'
+
 try:
     pdfmetrics.registerFont(TTFont('SimSun', FONT_FILE))
     FONT_NAME = 'SimSun'
 except:
-    FONT_NAME = 'Helvetica'
+    # Try Alpine Linux CJK font path
+    try:
+        import os
+        if os.path.exists(FONT_ALT):
+            pdfmetrics.registerFont(TTFont('NotoSans', FONT_ALT))
+            FONT_NAME = 'NotoSans'
+    except:
+        pass
 
 PAGE_W, PAGE_H = A4
 MARGIN = 25 * mm
