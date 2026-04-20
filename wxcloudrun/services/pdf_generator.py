@@ -40,6 +40,7 @@ try:
             try:
                 # PIL can load TTC files - store path for later
                 _chinese_font_path = fp
+                FONT_FILE = fp
                 print(f"DEBUG: PIL found Chinese font at {fp}", flush=True)
                 break
             except Exception as e:
@@ -60,6 +61,10 @@ MARGIN = 25 * mm
 COL_WIDTHS = [12*mm, 50*mm, 28*mm, 32*mm, 26*mm]
 HEADERS = ['序号', '应急装置安装地点', '放电时间', '剩余电量%', '备注']
 TIME_POINTS = ['0分钟', '20分钟', '40分钟', '80分钟', '100分钟', '120分钟']
+
+# Export globals for fonttest endpoint
+FONT_NAME = 'Helvetica'
+FONT_FILE = ''
 
 
 def _get_pil_font(size):
@@ -319,6 +324,9 @@ class PDFGenerator:
         c.setFont('Helvetica', 7)
         form_w = c.stringWidth(form_no, 'Helvetica', 7)
         c.drawString((PAGE_W - form_w) / 2, form_y, form_no)
+
+        # Export globals for fonttest endpoint
+        global FONT_NAME, FONT_FILE
 
 
 def decode_base64_image(data: str):
