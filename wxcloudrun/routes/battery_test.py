@@ -21,6 +21,17 @@ def get_photos_dir():
     return PHOTOS_DIR
 
 
+@battery_test_bp.route('/fonts', methods=['GET'])
+def list_fonts():
+    """Debug: list all available fonts on Alpine Linux"""
+    import subprocess
+    result = subprocess.run(['find', '/usr', '-name', '*.ttf', '-o', '-name', '*.ttc'], 
+                          capture_output=True, text=True, timeout=30)
+    return jsonify({
+        'fonts': result.stdout,
+        'returncode': result.returncode
+    })
+
 @battery_test_bp.route('/health', methods=['GET'])
 def health():
     # Lazy import pdf_generator to verify it works
