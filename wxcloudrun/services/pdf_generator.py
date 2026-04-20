@@ -1,13 +1,29 @@
 import os
 from datetime import datetime
 from io import BytesIO
+import base64
+import hashlib
+
+# Alpine Linux 兼容：移除 usedforsecurity 参数
+_original_md5 = hashlib.md5
+def _patched_md5(data=b'', *, usedforsecurity=True, **kwargs):
+    kwargs.pop('usedforsecurity', None)
+    return _original_md5(data, **kwargs)
+hashlib.md5 = _patched_md5
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.utils import ImageReader
-import base64
 
-FONT_NAME = 'Helvetica'
+FONT_FILE = 'C:/Windows/Fonts/simsun.ttc'
+try:
+    pdfmetrics.registerFont(TTFont('SimSun', FONT_FILE))
+    FONT_NAME = 'SimSun'
+except:
+    FONT_NAME = 'Helvetica'
 
 PAGE_W, PAGE_H = A4
 MARGIN = 25 * mm
@@ -57,18 +73,22 @@ class PDFGenerator:
         row_h = 8 * mm
         y = PAGE_H - MARGIN
 
+        # 每页标题（含测试组编号）
         c.setFont(FONT_NAME, 14)
         title = f'应急装置电池放电时间记录表  ({test_num}/{total_tests})'
         title_w = c.stringWidth(title, FONT_NAME, 14)
         c.drawString((PAGE_W - title_w) / 2, y, title)
         y -= 10 * mm
 
+        # 地点信息行
         loc_val = test.get('location', '')
         start_time = test.get('startTime', '')
         c.setFont(FONT_NAME, 9)
-        c.drawString(MARGIN, y, f'安装地点：{loc_val}　　　开始时间：{start_time}')
+        info_line = f'安装地点：{loc_val}　　　开始时间：{start_time}'
+        c.drawString(MARGIN, y, info_line)
         y -= 8 * mm
 
+        # 表头
         x = MARGIN
         for w, h_text in zip(COL_WIDTHS, HEADERS):
             c.setFillColorRGB(0.85, 0.85, 0.85)
@@ -81,6 +101,7 @@ class PDFGenerator:
             x += w
         y -= 8 * mm
 
+        # 6行数据
         records = test.get('records', [])
         for i in range(6):
             voltage = ''
@@ -90,6 +111,7 @@ class PDFGenerator:
             row_y = y - row_h
             cx = MARGIN
 
+            # A 序号
             c.setStrokeColorRGB(0.3, 0.3, 0.3)
             c.rect(cx, row_y, COL_WIDTHS[0], row_h)
             c.setFont(FONT_NAME, 8)
@@ -98,6 +120,7 @@ class PDFGenerator:
             c.drawString(cx + (COL_WIDTHS[0] - tw) / 2, row_y + 2, s)
             cx += COL_WIDTHS[0]
 
+            # B 地点（只在首行显示）
             c.rect(cx, row_y, COL_WIDTHS[1], row_h)
             if i == 0:
                 c.setFont(FONT_NAME, 8)
@@ -106,6 +129,7 @@ class PDFGenerator:
                 c.drawString(cx + 2, row_y + 2, disp)
             cx += COL_WIDTHS[1]
 
+            # C 放电时间
             c.rect(cx, row_y, COL_WIDTHS[2], row_h)
             c.setFont(FONT_NAME, 8)
             t = TIME_POINTS[i]
@@ -113,12 +137,14 @@ class PDFGenerator:
             c.drawString(cx + (COL_WIDTHS[2] - tw) / 2, row_y + 2, t)
             cx += COL_WIDTHS[2]
 
+            # D 剩余电量
             c.rect(cx, row_y, COL_WIDTHS[3], row_h)
             c.setFont(FONT_NAME, 8)
             tw = c.stringWidth(voltage, FONT_NAME, 8)
             c.drawString(cx + (COL_WIDTHS[3] - tw) / 2, row_y + 2, voltage)
             cx += COL_WIDTHS[3]
 
+            # E 备注（只在首行显示开始时间）
             c.rect(cx, row_y, COL_WIDTHS[4], row_h)
             if i == 0:
                 c.setFont(FONT_NAME, 7)
@@ -126,6 +152,7 @@ class PDFGenerator:
 
             y = row_y
 
+        # ===== 照片区域（每个测试单独整理）=====
         photos = [rec.get('photoBase64', '') for rec in records if rec.get('photoBase64')]
         if photos:
             y -= 6 * mm
@@ -139,8 +166,9 @@ class PDFGenerator:
             photo_h = photo_w * 0.75
             gap = 4 * mm
 
-            for idx_p, photo_data in enumerate(photos):
-                col = idx_p % photos_per_row
+            for idx, photo_data in enumerate(photos):
+                row = idx // photos_per_row
+                col = idx % photos_per_row
                 if y - photo_h < MARGIN + 5*mm:
                     c.showPage()
                     y = PAGE_H - MARGIN
@@ -164,7 +192,8 @@ class PDFGenerator:
 
                 c.setFont(FONT_NAME, 7)
                 c.setFillColorRGB(0.4, 0.4, 0.4)
-                c.drawString(px, py - 3*mm, f"照片 {idx_p + 1}")
+                label = f"照片 {idx + 1}"
+                c.drawString(px, py - 3*mm, label)
                 c.setFillColorRGB(0, 0, 0)
 
                 if col == photos_per_row - 1:
@@ -173,6 +202,7 @@ class PDFGenerator:
                 if col < photos_per_row - 1:
                     y -= (photo_h + 4 * mm)
 
+        # 页脚
         c.setFont(FONT_NAME, 7)
         c.setFillColorRGB(0.5, 0.5, 0.5)
         footer = f'生成时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}　　第 {test_num} 页 / 共 {total_tests} 页'
