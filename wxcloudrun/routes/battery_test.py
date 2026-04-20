@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, send_file
+from io import BytesIO
 import os
 import base64
 import uuid
