@@ -32,6 +32,34 @@ def list_fonts():
         'returncode': result.returncode
     })
 
+@battery_test_bp.route('/fonttest', methods=['GET'])
+def test_font():
+    """Test if font can be loaded and used for Chinese text"""
+    try:
+        from wxcloudrun.services.pdf_generator import FONT_NAME, FONT_FILE
+        # Try to draw Chinese text with the registered font
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        buf = BytesIO()
+        c = canvas.Canvas(buf, pagesize=A4)
+        c.setFont(FONT_NAME, 12)
+        # Test drawing Chinese
+        test_str = '应急装置电池放电时间记录表'
+        c.drawString(100, 700, test_str)
+        c.save()
+        buf.seek(0)
+        # Check if PDF has the text (won't know if squares until viewing)
+        import base64
+        pdf_b64 = base64.b64encode(buf.read()).decode('utf-8')
+        return jsonify({
+            'font_name': FONT_NAME,
+            'font_file': FONT_FILE,
+            'test_string': test_str,
+            'pdf_preview': pdf_b64[:200] + '...'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @battery_test_bp.route('/health', methods=['GET'])
 def health():
     # Lazy import pdf_generator to verify it works
