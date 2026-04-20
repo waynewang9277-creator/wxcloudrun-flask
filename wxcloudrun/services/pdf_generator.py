@@ -50,7 +50,10 @@ class PDFGenerator:
         tests = data.get('tests', [])
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         loc = (tests[0].get('location', 'unknown') if tests else 'unknown')
-        loc_clean = ''.join(c if c.isalnum() else '_' for c in loc)
+        # 只移除非法文件名字符，保留中文和空格
+        import re
+        safe_chars = re.sub(r'[/\\:*?"<>|]', '_', loc)
+        loc_clean = safe_chars.strip().replace(' ', '_')
         filename = f'battery_test_report_{loc_clean}_{timestamp}.pdf'
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, filename)
