@@ -170,7 +170,7 @@ class PDFGenerator:
         import re
         safe_chars = re.sub(r'[/\\:*?"<>|]', '_', loc)
         loc_clean = safe_chars.strip().replace(' ', '_')
-        filename = f'battery_test_report_{loc_clean}_{timestamp}.pdf'
+        filename = f'应急装置测试报告_{timestamp}.pdf'
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, filename)
 
