@@ -192,6 +192,22 @@ class PDFGenerator:
         row_h = 8 * mm
         y = PAGE_H - MARGIN
 
+        # Draw logo at top-left corner
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'logo.png')
+        if os.path.exists(logo_path):
+            try:
+                logo_reader = ImageReader(logo_path)
+                # Draw logo at top-left, scaled to ~20mm height
+                logo_h = 20 * mm
+                logo_w = logo_h * 1.5  # aspect ratio
+                c.drawImage(logo_reader, MARGIN, y - logo_h, width=logo_w, height=logo_h)
+                y -= logo_h + 3 * mm  # Move down after logo
+            except Exception as e:
+                print(f"DEBUG: logo load error: {e}", flush=True)
+                y -= 10 * mm
+        else:
+            y -= 10 * mm
+
         # Title - centered using draw_chinese_centered
         title_text = f'应急装置电池放电时间记录表  ({test_num}/{total_tests})'
         # Calculate page width available
@@ -266,7 +282,7 @@ class PDFGenerator:
         # Photo area
         photos = [rec.get('photoBase64', '') for rec in records if rec.get('photoBase64')]
         if photos:
-            y -= 6 * mm
+            y -= 14 * mm  # Moved down one row (8mm more than before)
             draw_chinese(c, '放电测试照片记录', MARGIN, y, font_size=10)
             y -= 5 * mm
 
