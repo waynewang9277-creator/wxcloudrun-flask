@@ -59,12 +59,13 @@ for pattern in ['/usr/share/fonts/**/NotoSans*.ttc', '/usr/share/fonts/**/NotoSa
 for fp in _alpine_font_paths:
     if os.path.exists(fp):
         try:
-            pdfmetrics.registerFont(TTFont('NotoSans', fp))
+            font_test = TTFont('NotoSans', fp)
+            pdfmetrics.registerFont(font_test)
             FONT_NAME = 'NotoSans'
-            print(f"DEBUG: Loaded font from {fp}")
+            print(f"DEBUG: Loaded font from {fp}", flush=True)
             break
         except Exception as e:
-            print(f"DEBUG: Failed to load font from {fp}: {e}")
+            print(f"DEBUG: Failed font {fp}: {e}", flush=True)
 
 PAGE_W, PAGE_H = A4
 MARGIN = 25 * mm
