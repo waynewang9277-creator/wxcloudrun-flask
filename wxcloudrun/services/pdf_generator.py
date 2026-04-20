@@ -99,9 +99,10 @@ def render_chinese_text(text, font_size=12, color=(0, 0, 0)):
             text_w = int(len(text) * font_size * _SCALE * 0.6)
             text_h = font_size * _SCALE
         # Create image with correct size (white background) at 2x resolution
-        img = Image.new('RGBA', (text_w + 10, text_h + 4), (255, 255, 255, 255))
+        # Add extra padding (6px top, 8px bottom) to prevent clipping
+        img = Image.new('RGBA', (text_w + 10, text_h + 14), (255, 255, 255, 255))
         draw_img = ImageDraw.Draw(img)
-        draw_img.text((5, 2), text, font=font, fill=color + (255,))
+        draw_img.text((5, 6), text, font=font, fill=color + (255,))
         buf = BytesIO()
         img.save(buf, format='PNG')
         buf.seek(0)
