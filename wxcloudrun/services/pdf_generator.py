@@ -64,6 +64,8 @@ for fp in _alpine_font_candidates:
             break
         except Exception as e:
             _print(f"DEBUG: TTFont FAILED for {fp}: {e}", flush=True)
+    else:
+        _print(f"DEBUG: Font file not found: {fp}", flush=True)
 
 print(f"DEBUG: FINAL FONT_NAME={FONT_NAME}, FONT_FILE={FONT_FILE}", flush=True)
 
