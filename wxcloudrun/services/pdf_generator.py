@@ -31,41 +31,41 @@ def _debug_fonts():
     return found
 
 FONT_FILE = 'C:/Windows/Fonts/simsun.ttc'
-FONT_NAME = 'Helvetica'
+FONT_NAME = 'Helvetica'  # Default fallback - does NOT support Chinese
 
 # Try Windows font first
 try:
     pdfmetrics.registerFont(TTFont('SimSun', FONT_FILE))
     FONT_NAME = 'SimSun'
-except:
-    pass
+    print(f"DEBUG: Windows font loaded, FONT_NAME={FONT_NAME}", flush=True)
+except Exception as e:
+    print(f"DEBUG: Windows font FAILED: {e}", flush=True)
 
 # Try Alpine Linux font paths
-_alpine_font_paths = [
+_alpine_font_candidates = [
     '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
     '/usr/share/fonts/noto/NotoSansCJK-Bold.ttc',
     '/usr/share/fonts/noto/NotoSansCJKsc-Regular.ttc',
     '/usr/share/fonts/noto/NotoSansCJKtc-Regular.ttc',
     '/usr/share/fonts/noto/NotoSans-Regular.ttc',
+    '/usr/share/fonts/noto/NotoSans-Bold.ttc',
     '/usr/share/fonts/noto/NotoSerifCJK-Regular.ttc',
     '/usr/share/fonts/noto/NotoSerifCJK-Bold.ttc',
 ]
-# Try glob patterns too
-for pattern in ['/usr/share/fonts/**/NotoSans*.ttc', '/usr/share/fonts/**/NotoSans*.ttf']:
-    import glob
-    for fp in glob.glob(pattern, recursive=True):
-        _alpine_font_paths.append(fp)
-
-for fp in _alpine_font_paths:
+_print = print  # capture print function
+for fp in _alpine_font_candidates:
     if os.path.exists(fp):
         try:
             font_test = TTFont('NotoSans', fp)
             pdfmetrics.registerFont(font_test)
             FONT_NAME = 'NotoSans'
-            print(f"DEBUG: Loaded font from {fp}", flush=True)
+            FONT_FILE = fp
+            _print(f"DEBUG: Alpine font loaded from {fp}, FONT_NAME={FONT_NAME}", flush=True)
             break
         except Exception as e:
-            print(f"DEBUG: Failed font {fp}: {e}", flush=True)
+            _print(f"DEBUG: TTFont FAILED for {fp}: {e}", flush=True)
+
+print(f"DEBUG: FINAL FONT_NAME={FONT_NAME}, FONT_FILE={FONT_FILE}", flush=True)
 
 PAGE_W, PAGE_H = A4
 MARGIN = 25 * mm
