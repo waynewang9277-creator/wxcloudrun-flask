@@ -275,6 +275,8 @@ class PDFGenerator:
             photo_w = (photo_area_w - 4 * mm) / photos_per_row
             photo_h = photo_w * 0.75
             gap = 4 * mm
+            # sig_y is defined later in signature section, use fixed value for page check
+            _sig_check_y = MARGIN + 20 * mm
 
             for idx, photo_data in enumerate(photos):
                 row = idx // photos_per_row
@@ -282,7 +284,7 @@ class PDFGenerator:
                 # Move y down when starting a new row (but not for first photo)
                 if col == 0 and idx > 0:
                     y -= photo_h + gap
-                if y - photo_h < sig_y + 20*mm:
+                if y - photo_h < _sig_check_y:
                     c.showPage()
                     y = PAGE_H - MARGIN
                 px = MARGIN + col * (photo_w + gap)
