@@ -187,9 +187,11 @@ class PDFGenerator:
         row_h = 8 * mm
         y = PAGE_H - MARGIN
 
-        # Title - use draw_chinese_centered for full title with Chinese
+        # Title - centered using draw_chinese_centered
         title_text = f'应急装置电池放电时间记录表  ({test_num}/{total_tests})'
-        draw_chinese(c, title_text, MARGIN, y, font_size=14)
+        # Calculate page width available
+        available_w = PAGE_W - 2 * MARGIN
+        draw_chinese_centered(c, title_text, MARGIN, y, available_w, font_size=14)
         y -= 10 * mm
 
         # Location info
@@ -275,7 +277,7 @@ class PDFGenerator:
                 # Move y down when starting a new row (but not for first photo)
                 if col == 0 and idx > 0:
                     y -= photo_h + gap
-                if y - photo_h < MARGIN + 5*mm:
+                if y - photo_h < sig_y + 20*mm:
                     c.showPage()
                     y = PAGE_H - MARGIN
                 px = MARGIN + col * (photo_w + gap)
@@ -291,6 +293,32 @@ class PDFGenerator:
                         print(f"DEBUG: photo error: {e}", flush=True)
                 c.setStrokeColorRGB(0.5, 0.5, 0.5)
                 c.rect(px, py, photo_w, photo_h)
+
+        # Signature area at bottom - 3 columns for 操作者/领班/工程主任
+        sig_y = MARGIN + 15 * mm
+        sig_col_w = (PAGE_W - 2 * MARGIN) / 3
+        sig_labels = ['操作者：', '领班：', '工程主任：']
+
+        for i, label in enumerate(sig_labels):
+            col_x = MARGIN + i * sig_col_w
+            # Draw label
+            draw_chinese(c, label, col_x, sig_y, font_size=9)
+            # Draw signature line
+            sig_line_y = sig_y - 8 * mm
+            c.setStrokeColorRGB(0, 0, 0)
+            c.setLineWidth(0.5)
+            c.line(col_x, sig_line_y, col_x + sig_col_w - 10*mm, sig_line_y)
+            # Draw 日期 label and line below
+            date_y = sig_line_y - 6 * mm
+            draw_chinese(c, '日期：', col_x, date_y, font_size=9)
+            c.line(col_x + 15*mm, date_y - 2*mm, col_x + sig_col_w - 10*mm, date_y - 2*mm)
+
+        # Form number at bottom
+        form_no = 'SHKS/R0/2579/REV03/20240630'
+        form_y = MARGIN
+        c.setFont('Helvetica', 7)
+        form_w = c.stringWidth(form_no, 'Helvetica', 7)
+        c.drawString((PAGE_W - form_w) / 2, form_y, form_no)
 
 
 def decode_base64_image(data: str):
